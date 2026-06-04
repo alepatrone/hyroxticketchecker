@@ -1,58 +1,6 @@
 {
   "events": [
     {
-      "key": "toronto",
-      "name": "GoodLife HYROX Toronto | Season 26/27",
-      "officialEventPageUrl": "https://hyrox.com/event/goodlife-hyrox-toronto-26-27/",
-      "ticketPageUrl": "https://ca.hyrox.com/event/hyrox-toronto-season-26-27-3bsreb",
-      "eventDates": {
-        "start": "2026-10-01",
-        "end": "2026-10-04",
-        "timezone": "America/Toronto"
-      }
-    },
-    {
-      "key": "chiba",
-      "name": "HYROX Chiba | Season 26/27",
-      "officialEventPageUrl": "https://hyrox.com/event/hyrox-chiba/",
-      "ticketPageUrl": "https://japan.hyrox.com/event/hyrox-chiba-season-26-27-qzyubs?useEmbed=true",
-      "eventDates": {
-        "start": "2026-08-06",
-        "end": "2026-08-09",
-        "timezone": "Asia/Tokyo"
-      },
-      "ticketFilter": {
-        "includedCompetitionClasses": [
-          "SOLO_OPEN_M",
-          "SOLO_PRO_M",
-          "DOUBLES_OPEN_M",
-          "DOUBLES_PRO_M",
-          "RELAY_M"
-        ]
-      }
-    },
-    {
-      "key": "seoul",
-      "name": "AirAsia HYROX Seoul",
-      "officialEventPageUrl": "https://hyrox.com/event/hyrox-seoul/",
-      "ticketPageUrl": "https://korea.hyrox.com/event/hyrox-seoul-season-26-27-vthaza?useEmbed=true",
-      "eventDates": {
-        "start": "2026-11-14",
-        "end": "2026-11-15",
-        "timezone": "Asia/Seoul"
-      }
-    },
-    {
-      "key": "vancouver",
-      "name": "HYROX Vancouver",
-      "officialEventPageUrl": "https://hyrox.com/event/hyrox-vancouver/",
-      "eventDates": {
-        "start": "2026-12-18",
-        "end": "2026-12-20",
-        "timezone": "America/Vancouver"
-      }
-    },
-    {
       "key": "tenerife",
       "name": "HYROX Tenerife | Season 26/27",
       "officialEventPageUrl": "https://hyrox.com/event/hyrox-tenerife/"
