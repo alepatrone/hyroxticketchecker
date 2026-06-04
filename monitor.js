@@ -1,5 +1,6 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const http = require("node:http");
 
 const CONFIG_FILE = path.join(__dirname, "monitor.config.json");
 const DOT_ENV_FILE = path.join(__dirname, ".env");
@@ -1456,6 +1457,15 @@ async function startBotLoop() {
   await loadDotEnv();
   const config = await loadJson(CONFIG_FILE);
   validateConfig(config);
+
+  const port = process.env.PORT || 3000;
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('HYROX Bot is running.\n');
+  });
+  server.listen(port, () => {
+    console.log(`🌐 Server web avviato sulla porta ${port} (necessario per Render).`);
+  });
 
   while (true) {
     try {

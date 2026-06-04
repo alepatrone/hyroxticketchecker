@@ -1,0 +1,5 @@
+.env
+monitor.state.json
+monitor.log
+.monitor-cache/
+node_modules/
