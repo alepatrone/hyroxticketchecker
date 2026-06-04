@@ -1038,24 +1038,30 @@ async function processTelegramCommands(config, state) {
 
       const text = msg.text.trim();
       if (text.startsWith('/add ')) {
-        const eventUrl = text.slice(5).trim();
-        if (eventUrl.startsWith('http')) {
-          const newEvent = {
-            key: slugify(eventUrl),
-            name: `(Dynamic) ${eventUrl.split('/').filter(Boolean).pop()}`,
-            officialEventPageUrl: eventUrl
-          };
-          const exists = state.dynamicEvents.some(e => e.officialEventPageUrl === eventUrl || e.ticketPageUrl === eventUrl);
-          if (!exists) {
-            state.dynamicEvents.push(newEvent);
-            stateModified = true;
-            await sendTelegramMessage(config, `✅ Evento aggiunto alla coda di monitoraggio:\n${eventUrl}`);
-            console.log(`Added dynamic event via Telegram: ${eventUrl}`);
-          } else {
-            await sendTelegramMessage(config, `⚠️ Questo evento è già monitorato.`);
+        let eventInput = text.slice(5).trim();
+        let eventUrl = eventInput;
+        
+        if (!eventUrl.startsWith('http')) {
+          let slug = eventUrl.toLowerCase().replace(/\s+/g, '-');
+          if (!slug.startsWith('hyrox-')) {
+            slug = 'hyrox-' + slug;
           }
+          eventUrl = `https://hyrox.com/event/${slug}/`;
+        }
+
+        const newEvent = {
+          key: slugify(eventUrl),
+          name: `(Dynamic) ${eventUrl.split('/').filter(Boolean).pop()}`,
+          officialEventPageUrl: eventUrl
+        };
+        const exists = state.dynamicEvents.some(e => e.officialEventPageUrl === eventUrl || e.ticketPageUrl === eventUrl);
+        if (!exists) {
+          state.dynamicEvents.push(newEvent);
+          stateModified = true;
+          await sendTelegramMessage(config, `✅ Evento aggiunto alla coda di monitoraggio:\n${eventUrl}`);
+          console.log(`Added dynamic event via Telegram: ${eventUrl}`);
         } else {
-          await sendTelegramMessage(config, `⚠️ URL non valido. Usa il formato:\n/add https://hyrox.com/event/...`);
+          await sendTelegramMessage(config, `⚠️ Questo evento è già monitorato.`);
         }
       } else if (text === '/list') {
         const allEvents = getConfiguredEvents(config, state);
@@ -1086,6 +1092,12 @@ async function processTelegramCommands(config, state) {
             if (count > 0) statusStr = "🟢 " + count + " disp.";
           }
           lines.push(`- ${e.name}: ${statusStr}`);
+
+          if (evState && evState.lastResult?.availableMatchedTicketCount > 0 && evState.activeAthleteTickets) {
+            for (const ticket of evState.activeAthleteTickets) {
+              lines.push(`  └ ${ticket.name}: ${ticket.availableQuantity} disp.`);
+            }
+          }
         }
         await sendTelegramMessage(config, `📊 Report Disponibilità:\n\n${lines.join('\n')}`);
       } else if (text === '/check') {
@@ -1509,6 +1521,12 @@ async function startBotLoop() {
             if (count > 0) statusStr = "🟢 " + count + " disp.";
           }
           lines.push(`- ${e.name}: ${statusStr}`);
+
+          if (evState && evState.lastResult?.availableMatchedTicketCount > 0 && evState.activeAthleteTickets) {
+            for (const ticket of evState.activeAthleteTickets) {
+              lines.push(`  └ ${ticket.name}: ${ticket.availableQuantity} disp.`);
+            }
+          }
         }
         await sendTelegramMessage(config, `✅ Controllo completato!\n\n📊 Report Aggiornato:\n\n${lines.join('\n')}`);
       }
