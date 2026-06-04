@@ -1,0 +1,205 @@
+{
+  "events": {
+    "toronto": {
+      "lastCheckedAt": "2026-06-04T08:32:56.798Z",
+      "eventName": "GoodLife HYROX Toronto | Season 26/27",
+      "eventId": "69b1a82644f61c5e20b7eb07",
+      "officialEventPageUrl": "https://hyrox.com/event/goodlife-hyrox-toronto-26-27/",
+      "ticketPageUrl": "https://ca.hyrox.com/event/hyrox-toronto-season-26-27-3bsreb",
+      "checkoutPageUrl": "https://ca.hyrox.com/checkout/69b1a82644f61c5e20b7eb07",
+      "availabilityDetectorVersion": 3,
+      "activeAthleteTicketIds": [],
+      "activeAthleteTickets": [],
+      "lastResult": {
+        "status": "ok",
+        "eventPageTemporarilyUnreadable": false,
+        "eventPageTemporaryUnreadableError": null,
+        "pageTicketCount": 89,
+        "availableMatchedTicketCount": 0,
+        "changedMatchedTicketCount": 0,
+        "newMatchedTicketCount": 0,
+        "quantityIncreaseMatchedTicketCount": 0,
+        "priorityChangedMatchedTicketCount": 0,
+        "priorityNewMatchedTicketCount": 0,
+        "priorityQuantityIncreaseMatchedTicketCount": 0
+      }
+    },
+    "chiba": {
+      "lastCheckedAt": "2026-06-04T08:32:56.798Z",
+      "eventName": "HYROX Chiba | Season 26/27",
+      "eventId": "69c4d6d5fd6ae5af35120925",
+      "officialEventPageUrl": "https://hyrox.com/event/hyrox-chiba/",
+      "ticketPageUrl": "https://japan.hyrox.com/event/hyrox-chiba-season-26-27-qzyubs?useEmbed=true",
+      "checkoutPageUrl": "https://japan.hyrox.com/checkout/69c4d6d5fd6ae5af35120925?useEmbed=true",
+      "availabilityDetectorVersion": 3,
+      "activeAthleteTicketIds": [],
+      "activeAthleteTickets": [],
+      "lastResult": {
+        "status": "ok",
+        "eventPageTemporarilyUnreadable": false,
+        "eventPageTemporaryUnreadableError": null,
+        "pageTicketCount": 46,
+        "availableMatchedTicketCount": 0,
+        "changedMatchedTicketCount": 0,
+        "newMatchedTicketCount": 0,
+        "quantityIncreaseMatchedTicketCount": 0,
+        "priorityChangedMatchedTicketCount": 0,
+        "priorityNewMatchedTicketCount": 0,
+        "priorityQuantityIncreaseMatchedTicketCount": 0
+      }
+    },
+    "seoul": {
+      "lastCheckedAt": "2026-06-04T08:32:56.798Z",
+      "eventName": "AirAsia | HYROX Seoul | Season 26/27",
+      "eventId": "69fafdfb5e85aa5b5e0ae5a1",
+      "officialEventPageUrl": "https://hyrox.com/event/hyrox-seoul/",
+      "ticketPageUrl": "https://korea.hyrox.com/event/hyrox-seoul-season-26-27-vthaza?useEmbed=true",
+      "checkoutPageUrl": "https://korea.hyrox.com/checkout/69fafdfb5e85aa5b5e0ae5a1?useEmbed=true",
+      "availabilityDetectorVersion": 3,
+      "activeAthleteTicketIds": [],
+      "activeAthleteTickets": [],
+      "lastResult": {
+        "status": "ok",
+        "eventPageTemporarilyUnreadable": false,
+        "eventPageTemporaryUnreadableError": null,
+        "pageTicketCount": 35,
+        "availableMatchedTicketCount": 0,
+        "changedMatchedTicketCount": 0,
+        "newMatchedTicketCount": 0,
+        "quantityIncreaseMatchedTicketCount": 0,
+        "priorityChangedMatchedTicketCount": 0,
+        "priorityNewMatchedTicketCount": 0,
+        "priorityQuantityIncreaseMatchedTicketCount": 0
+      }
+    },
+    "vancouver": {
+      "lastCheckedAt": "2026-06-04T08:32:56.798Z",
+      "eventName": "HYROX Vancouver",
+      "officialEventPageUrl": "https://hyrox.com/event/hyrox-vancouver/",
+      "ticketPageUrl": null,
+      "checkoutPageUrl": null,
+      "availabilityDetectorVersion": 3,
+      "activeAthleteTicketIds": [],
+      "activeAthleteTickets": [],
+      "lastResult": {
+        "status": "waiting_for_ticket_page",
+        "officialPageTicketSalesStartSoon": true,
+        "candidateTicketPageUrlCount": 0,
+        "availableMatchedTicketCount": 0,
+        "changedMatchedTicketCount": 0,
+        "newMatchedTicketCount": 0,
+        "quantityIncreaseMatchedTicketCount": 0,
+        "priorityChangedMatchedTicketCount": 0,
+        "priorityNewMatchedTicketCount": 0,
+        "priorityQuantityIncreaseMatchedTicketCount": 0
+      }
+    },
+    "tenerife": {
+      "lastCheckedAt": "2026-06-04T08:32:56.798Z",
+      "eventName": "HYROX Tenerife | Season 26/27",
+      "eventId": "69a9876f634e0d9ae4fc82c8",
+      "officialEventPageUrl": "https://hyrox.com/event/hyrox-tenerife/",
+      "ticketPageUrl": "https://spain.hyrox.com/event/hyrox-tenerife-season-26-27-iv1ecx?useEmbed=true",
+      "checkoutPageUrl": "https://spain.hyrox.com/checkout/69a9876f634e0d9ae4fc82c8?useEmbed=true",
+      "availabilityDetectorVersion": 3,
+      "activeAthleteTicketIds": [
+        "69a9876fc86acf4f6c63f722",
+        "69a9876fc86acf4f6c63f724",
+        "69a9876fc86acf4f6c63f776",
+        "69a9876fc86acf4f6c63f777"
+      ],
+      "activeAthleteTickets": [
+        {
+          "id": "69a9876fc86acf4f6c63f722",
+          "name": "HYROX DOUBLES MEN | Friday",
+          "active": true,
+          "hidden": false,
+          "isCompetition": "TRUE",
+          "competitionClass": "DOUBLES_OPEN_M",
+          "date": "2026-09-04T06:00:00.000Z",
+          "availableQuantity": 12,
+          "buyable": true,
+          "availability": {
+            "quantity": 12,
+            "blockedByRules": false,
+            "ticketVolume": 45,
+            "categoryVolume": 264,
+            "eventVolume": 92391,
+            "categoryName": "Doubles"
+          }
+        },
+        {
+          "id": "69a9876fc86acf4f6c63f724",
+          "name": "HYROX DOUBLES WOMEN | Friday",
+          "active": true,
+          "hidden": false,
+          "isCompetition": "TRUE",
+          "competitionClass": "DOUBLES_OPEN_W",
+          "date": "2026-09-04T06:00:00.000Z",
+          "availableQuantity": 12,
+          "buyable": true,
+          "availability": {
+            "quantity": 12,
+            "blockedByRules": false,
+            "ticketVolume": 45,
+            "categoryVolume": 264,
+            "eventVolume": 92391,
+            "categoryName": "Doubles"
+          }
+        },
+        {
+          "id": "69a9876fc86acf4f6c63f776",
+          "name": "HYROX MENS RELAY | Sunday",
+          "active": true,
+          "hidden": false,
+          "isCompetition": "TRUE",
+          "competitionClass": "RELAY_M",
+          "date": "2026-09-06T07:00:00.000Z",
+          "availableQuantity": 12,
+          "buyable": true,
+          "availability": {
+            "quantity": 12,
+            "blockedByRules": false,
+            "ticketVolume": 18,
+            "categoryVolume": 192,
+            "eventVolume": 92391,
+            "categoryName": "Relay"
+          }
+        },
+        {
+          "id": "69a9876fc86acf4f6c63f777",
+          "name": "HYROX MENS RELAY TEAM MEMBER | Sunday",
+          "active": true,
+          "hidden": false,
+          "isCompetition": "TRUE",
+          "competitionClass": "RELAY_M",
+          "date": "2026-09-06T07:00:00.000Z",
+          "availableQuantity": 12,
+          "buyable": true,
+          "availability": {
+            "quantity": 12,
+            "blockedByRules": false,
+            "ticketVolume": 54,
+            "categoryVolume": 192,
+            "eventVolume": 92391,
+            "categoryName": "Relay"
+          }
+        }
+      ],
+      "lastResult": {
+        "status": "ok",
+        "eventPageTemporarilyUnreadable": false,
+        "eventPageTemporaryUnreadableError": null,
+        "pageTicketCount": 61,
+        "availableMatchedTicketCount": 4,
+        "changedMatchedTicketCount": 4,
+        "newMatchedTicketCount": 4,
+        "quantityIncreaseMatchedTicketCount": 0,
+        "priorityChangedMatchedTicketCount": 0,
+        "priorityNewMatchedTicketCount": 0,
+        "priorityQuantityIncreaseMatchedTicketCount": 0
+      }
+    }
+  },
+  "lastCheckedAt": "2026-06-04T08:32:56.798Z"
+}

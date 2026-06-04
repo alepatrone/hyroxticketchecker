@@ -1,0 +1,18 @@
+{
+  "name": "hyrox-tickets",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HYROX ticket availability monitor",
+  "scripts": {
+    "start": "node monitor.js --bot",
+    "check": "node monitor.js",
+    "check:now": "node monitor.js --force",
+    "bot": "node monitor.js --bot",
+    "dry-run": "node monitor.js --dry-run",
+    "notify-test": "node monitor.js --notify-test",
+    "notify-workflow-failure": "node monitor.js --workflow-failure-notify"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "events": [
+    {
+      "key": "toronto",
+      "name": "GoodLife HYROX Toronto | Season 26/27",
+      "officialEventPageUrl": "https://hyrox.com/event/goodlife-hyrox-toronto-26-27/",
+      "ticketPageUrl": "https://ca.hyrox.com/event/hyrox-toronto-season-26-27-3bsreb",
+      "eventDates": {
+        "start": "2026-10-01",
+        "end": "2026-10-04",
+        "timezone": "America/Toronto"
+      }
+    },
+    {
+      "key": "chiba",
+      "name": "HYROX Chiba | Season 26/27",
+      "officialEventPageUrl": "https://hyrox.com/event/hyrox-chiba/",
+      "ticketPageUrl": "https://japan.hyrox.com/event/hyrox-chiba-season-26-27-qzyubs?useEmbed=true",
+      "eventDates": {
+        "start": "2026-08-06",
+        "end": "2026-08-09",
+        "timezone": "Asia/Tokyo"
+      },
+      "ticketFilter": {
+        "includedCompetitionClasses": [
+          "SOLO_OPEN_M",
+          "SOLO_PRO_M",
+          "DOUBLES_OPEN_M",
+          "DOUBLES_PRO_M",
+          "RELAY_M"
+        ]
+      }
+    },
+    {
+      "key": "seoul",
+      "name": "AirAsia HYROX Seoul",
+      "officialEventPageUrl": "https://hyrox.com/event/hyrox-seoul/",
+      "ticketPageUrl": "https://korea.hyrox.com/event/hyrox-seoul-season-26-27-vthaza?useEmbed=true",
+      "eventDates": {
+        "start": "2026-11-14",
+        "end": "2026-11-15",
+        "timezone": "Asia/Seoul"
+      }
+    },
+    {
+      "key": "vancouver",
+      "name": "HYROX Vancouver",
+      "officialEventPageUrl": "https://hyrox.com/event/hyrox-vancouver/",
+      "eventDates": {
+        "start": "2026-12-18",
+        "end": "2026-12-20",
+        "timezone": "America/Vancouver"
+      }
+    },
+    {
+      "key": "tenerife",
+      "name": "HYROX Tenerife | Season 26/27",
+      "officialEventPageUrl": "https://hyrox.com/event/hyrox-tenerife/"
+    }
+  ],
+  "monitoring": {
+    "mode": "checkout_page_availability_json",
+    "userAgent": "Mozilla/5.0 hyrox-ticket-monitor/1.0",
+    "timeoutSeconds": 30,
+    "retryAttempts": 3,
+    "retryDelaySeconds": 10,
+    "minimumMinutesBetweenChecks": 45,
+    "alertOnlyOnChanges": true,
+    "alertOnFirstRunAvailableTickets": true,
+    "stateFile": "monitor.state.json",
+    "logFile": "monitor.log"
+  },
+  "ticketFilter": {
+    "onlyAthleteTickets": true,
+    "excludedCompetitionClasses": [],
+    "competitionMetaField": "meta.is_competition",
+    "competitionMetaValue": "TRUE",
+    "availableWhen": {
+      "field": "buyable",
+      "equals": true
+    },
+    "ignoreNamesContaining": [
+      "CHARITY",
+      "ADAPTIVE",
+      "SPECTATOR",
+      "PHOTO PACKAGE",
+      "FREE U12"
+    ],
+    "prioritySignals": [
+      {
+        "label": "Open Men",
+        "competitionClass": "SOLO_OPEN_M",
+        "nameMustNotContain": [
+          "CHARITY"
+        ],
+      "priorityMessagePrefix": "PRIORITY: Open Men ticket available"
+      }
+    ]
+  },
+  "scheduleRecommendation": {
+    "normal": {
+      "description": "Low-noise baseline checks.",
+      "timesLocal": [
+        "08:00",
+        "20:00"
+      ]
+    },
+    "highInterest": {
+      "description": "Use this when you are actively trying to catch returned tickets.",
+      "intervalMinutes": 45,
+      "activeHoursLocal": {
+        "start": "07:00",
+        "end": "23:00"
+      }
+    }
+  },
+  "notifications": {
+    "telegram": {
+      "enabled": true,
+      "botTokenEnvVar": "TELEGRAM_BOT_TOKEN",
+      "chatIdEnvVar": "TELEGRAM_CHAT_ID",
+      "notifyOn": [
+        "new_active_athlete_ticket",
+        "ticket_became_active",
+        "priority_ticket_became_active",
+        "ticket_page_temporarily_unreadable",
+        "monitor_error_after_retries"
+      ]
+    }
+  }
+}
