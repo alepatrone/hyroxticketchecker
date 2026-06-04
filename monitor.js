@@ -50,24 +50,26 @@ function slugify(value) {
     .slice(0, 60) || "event";
 }
 
-function getConfiguredEvents(config) {
-  const events = Array.isArray(config.events) && config.events.length > 0
+function getConfiguredEvents(config, state = {}) {
+  const baseEvents = Array.isArray(config.events) && config.events.length > 0
     ? config.events
     : [config.event].filter(Boolean);
 
-  return events.map((eventConfig, index) => ({
+  const dynamicEvents = state.dynamicEvents || [];
+
+  return [...baseEvents, ...dynamicEvents].map((eventConfig, index) => ({
     ...eventConfig,
     key: eventConfig.key || slugify(eventConfig.name || eventConfig.ticketPageUrl || index)
   }));
 }
 
-function validateConfig(config) {
+function validateConfig(config, state = {}) {
   const mode = config.monitoring?.mode || "checkout_page_availability_json";
   if (mode !== "checkout_page_availability_json") {
     throw new Error(`Unsupported monitoring.mode: ${mode}`);
   }
 
-  if (getConfiguredEvents(config).length === 0) {
+  if (getConfiguredEvents(config, state).length === 0) {
     throw new Error("No HYROX events configured.");
   }
 }
@@ -96,10 +98,10 @@ function getEventState(state, eventConfig) {
   return { ...defaultEventState };
 }
 
-function getEventUrls(config) {
+function getEventUrls(config, state = {}) {
   return [
     ...new Set(
-      getConfiguredEvents(config)
+      getConfiguredEvents(config, state)
         .flatMap((eventConfig) => [
           eventConfig.ticketPageUrl,
           eventConfig.officialEventPageUrl
@@ -809,7 +811,7 @@ function getGitHubRunUrl() {
   return `${serverUrl}/${repository}/actions/runs/${runId}`;
 }
 
-function buildMonitorErrorMessage(config, error, context = {}) {
+function buildMonitorErrorMessage(config, state, error, context = {}) {
   const runUrl = getGitHubRunUrl();
   const serialized = serializeError(error);
   const lines = [
@@ -819,7 +821,7 @@ function buildMonitorErrorMessage(config, error, context = {}) {
     ""
   ];
 
-  lines.push(...getEventUrls(config));
+  lines.push(...getEventUrls(config, state));
 
   if (runUrl) {
     lines.push("");
@@ -930,7 +932,7 @@ function maybeQueueTemporaryUnreadableAlert({
   );
 }
 
-function buildWorkflowFailureMessage(config) {
+function buildWorkflowFailureMessage(config, state = {}) {
   const runUrl = getGitHubRunUrl();
   const headline = runUrl
     ? "HYROX ticket monitor workflow failed outside the monitor script."
@@ -939,7 +941,7 @@ function buildWorkflowFailureMessage(config) {
     headline
   ];
 
-  lines.push(...getEventUrls(config));
+  lines.push(...getEventUrls(config, state));
 
   if (runUrl) {
     lines.push("");
@@ -949,14 +951,14 @@ function buildWorkflowFailureMessage(config) {
   return lines.filter(Boolean).join("\n").slice(0, 1900);
 }
 
-async function notifyMonitorError(config, error, context = {}) {
+async function notifyMonitorError(config, state, error, context = {}) {
   if (!shouldNotify(config, "monitor_error_after_retries")) {
     console.log("Telegram error notification type disabled.");
     await markErrorNotified(config);
     return;
   }
 
-  const message = buildMonitorErrorMessage(config, error, context);
+  const message = buildMonitorErrorMessage(config, state, error, context);
 
   try {
     const sent = await sendTelegramMessage(config, message);
@@ -1094,7 +1096,6 @@ async function main() {
   await loadDotEnv();
 
   const config = await loadJson(CONFIG_FILE);
-  validateConfig(config);
   const state = await loadState(config, defaultState);
   validateConfig(config, state);
 
@@ -1456,7 +1457,6 @@ async function startBotLoop() {
 
   await loadDotEnv();
   const config = await loadJson(CONFIG_FILE);
-  validateConfig(config);
 
   const port = process.env.PORT || 3000;
   const server = http.createServer((req, res) => {
@@ -1470,6 +1470,7 @@ async function startBotLoop() {
   while (true) {
     try {
       const state = await loadState(config, defaultState);
+      validateConfig(config, state);
       const oldOffset = state.telegramUpdateOffset;
 
       const result = await processTelegramCommands(config, state);
