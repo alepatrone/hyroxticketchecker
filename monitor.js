@@ -1075,11 +1075,11 @@ async function processTelegramCommands(config, state) {
         for (const e of allEvents) {
           const evState = state.events?.[e.key];
           const count = evState?.lastResult?.availableMatchedTicketCount ?? 0;
-          lines.push(`- ${e.name}: ${count > 0 ? \`🟢 \${count} disp.\` : \`🔴 Esaurito\`}`);
+          lines.push(`- ${e.name}: ${count > 0 ? "🟢 " + count + " disp." : "🔴 Esaurito"}`);
         }
-        await sendTelegramMessage(config, \`📊 Report Disponibilità:\n\n\${lines.join('\n')}\`);
+        await sendTelegramMessage(config, `📊 Report Disponibilità:\n\n${lines.join('\n')}`);
       } else if (text === '/check') {
-        await sendTelegramMessage(config, \`⏳ Avvio controllo immediato dei biglietti...\`);
+        await sendTelegramMessage(config, `⏳ Avvio controllo immediato dei biglietti...`);
         triggerCheck = true;
       }
     }
