@@ -8,6 +8,7 @@ const DOT_ENV_FILE = path.join(__dirname, ".env");
 const args = new Set(process.argv.slice(2));
 const dryRun = args.has("--dry-run");
 let force = args.has("--force") || dryRun;
+let targetEventKey = null;
 const isBotMode = args.has("--bot");
 const notifyTest = args.has("--notify-test");
 const workflowFailureNotify = args.has("--workflow-failure-notify");
@@ -1002,6 +1003,31 @@ function shouldSkipForInterval(state, config) {
   return elapsedMs < minimumMinutes * 60 * 1000;
 }
 
+async function setTelegramCommands(config) {
+  const telegram = config.notifications?.telegram || {};
+  const botToken = process.env[telegram.botTokenEnvVar || "TELEGRAM_BOT_TOKEN"];
+  if (!botToken || !telegram.enabled) return;
+
+  const commands = [
+    { command: "report", description: "Mostra disponibilità eventi" },
+    { command: "check", description: "Controlla biglietti adesso (anche /check città)" },
+    { command: "add", description: "Aggiungi evento (es. /add milan)" },
+    { command: "remove", description: "Rimuovi evento (es. /remove milan)" },
+    { command: "list", description: "Elenca eventi monitorati" }
+  ];
+
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/setMyCommands`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commands })
+    });
+    console.log("Comandi Telegram impostati con successo.");
+  } catch (e) {
+    console.error("Errore impostazione comandi Telegram:", e.message);
+  }
+}
+
 async function processTelegramCommands(config, state) {
   const telegram = config.notifications?.telegram || {};
   const botToken = process.env[telegram.botTokenEnvVar || "TELEGRAM_BOT_TOKEN"];
@@ -1068,12 +1094,17 @@ async function processTelegramCommands(config, state) {
         const lines = allEvents.map(e => `- ${e.name}\n  ${e.officialEventPageUrl || e.ticketPageUrl}`);
         await sendTelegramMessage(config, `📋 Eventi monitorati attualmente (${allEvents.length}):\n\n${lines.join('\n\n')}`);
       } else if (text.startsWith('/remove ')) {
-        const eventUrl = text.slice(8).trim();
+        const query = text.slice(8).trim().toLowerCase();
         const initialLength = state.dynamicEvents.length;
-        state.dynamicEvents = state.dynamicEvents.filter(e => e.officialEventPageUrl !== eventUrl && e.ticketPageUrl !== eventUrl);
+        state.dynamicEvents = state.dynamicEvents.filter(e => 
+          !(e.officialEventPageUrl?.toLowerCase().includes(query)) && 
+          !(e.ticketPageUrl?.toLowerCase().includes(query)) &&
+          !(e.name?.toLowerCase().includes(query)) &&
+          !(e.key?.toLowerCase().includes(query))
+        );
         if (state.dynamicEvents.length < initialLength) {
           stateModified = true;
-          await sendTelegramMessage(config, `🗑️ Evento rimosso dal monitoraggio:\n${eventUrl}`);
+          await sendTelegramMessage(config, `🗑️ Evento rimosso dal monitoraggio.`);
         } else {
           await sendTelegramMessage(config, `⚠️ L'evento non è stato trovato tra quelli aggiunti dinamicamente. Usa /list per vedere gli eventi.`);
         }
@@ -1100,9 +1131,24 @@ async function processTelegramCommands(config, state) {
           }
         }
         await sendTelegramMessage(config, `📊 Report Disponibilità:\n\n${lines.join('\n')}`);
-      } else if (text === '/check') {
-        await sendTelegramMessage(config, `⏳ Avvio controllo immediato dei biglietti...`);
-        triggerCheck = true;
+      } else if (text === '/check' || text.startsWith('/check ')) {
+        const parts = text.split(' ');
+        if (parts.length > 1) {
+          const query = parts.slice(1).join(' ').toLowerCase();
+          const allEvents = getConfiguredEvents(config, state);
+          const event = allEvents.find(e => e.key.includes(query) || (e.name && e.name.toLowerCase().includes(query)));
+          if (event) {
+             await sendTelegramMessage(config, `⏳ Avvio controllo immediato per:\n${event.name}...`);
+             targetEventKey = event.key;
+             triggerCheck = true;
+          } else {
+             await sendTelegramMessage(config, `⚠️ Evento non trovato: ${query}`);
+          }
+        } else {
+          await sendTelegramMessage(config, `⏳ Avvio controllo immediato di tutti gli eventi...`);
+          targetEventKey = null;
+          triggerCheck = true;
+        }
       }
     }
   } catch (err) {
@@ -1153,7 +1199,11 @@ async function main() {
     await processTelegramCommands(config, state);
   }
 
-  const configuredEvents = getConfiguredEvents(config, state);
+  let configuredEvents = getConfiguredEvents(config, state);
+  if (targetEventKey) {
+    configuredEvents = configuredEvents.filter(e => e.key === targetEventKey);
+  }
+
   const checkedAt = new Date().toISOString();
   const nextState = {
     ...state,
@@ -1478,6 +1528,8 @@ async function startBotLoop() {
   await loadDotEnv();
   const config = await loadJson(CONFIG_FILE);
 
+  await setTelegramCommands(config);
+
   const port = process.env.PORT || 3000;
   const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -1507,7 +1559,12 @@ async function startBotLoop() {
         console.log("Scansione immediata completata.\n");
 
         const latestState = await loadState(config, defaultState);
-        const allEvents = getConfiguredEvents(config, latestState);
+        let allEvents = getConfiguredEvents(config, latestState);
+        
+        if (targetEventKey) {
+          allEvents = allEvents.filter(e => e.key === targetEventKey);
+        }
+
         const lines = [];
         for (const e of allEvents) {
           const evState = latestState.events?.[e.key];
@@ -1529,6 +1586,8 @@ async function startBotLoop() {
           }
         }
         await sendTelegramMessage(config, `✅ Controllo completato!\n\n📊 Report Aggiornato:\n\n${lines.join('\n')}`);
+        
+        targetEventKey = null;
       }
     } catch (e) {
       console.error("Bot loop error:", e.message);
