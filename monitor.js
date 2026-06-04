@@ -1076,8 +1076,16 @@ async function processTelegramCommands(config, state) {
         const lines = [];
         for (const e of allEvents) {
           const evState = state.events?.[e.key];
-          const count = evState?.lastResult?.availableMatchedTicketCount ?? 0;
-          lines.push(`- ${e.name}: ${count > 0 ? "🟢 " + count + " disp." : "🔴 Esaurito"}`);
+          let statusStr = "🔴 Esaurito";
+          if (!evState) {
+            statusStr = "⚪ Mai controllato";
+          } else if (evState.lastResult?.status === "waiting_for_ticket_page") {
+            statusStr = "⏳ In attesa di vendite";
+          } else {
+            const count = evState.lastResult?.availableMatchedTicketCount ?? 0;
+            if (count > 0) statusStr = "🟢 " + count + " disp.";
+          }
+          lines.push(`- ${e.name}: ${statusStr}`);
         }
         await sendTelegramMessage(config, `📊 Report Disponibilità:\n\n${lines.join('\n')}`);
       } else if (text === '/check') {
@@ -1485,6 +1493,24 @@ async function startBotLoop() {
         await main();
         force = false;
         console.log("Scansione immediata completata.\n");
+
+        const latestState = await loadState(config, defaultState);
+        const allEvents = getConfiguredEvents(config, latestState);
+        const lines = [];
+        for (const e of allEvents) {
+          const evState = latestState.events?.[e.key];
+          let statusStr = "🔴 Esaurito";
+          if (!evState) {
+            statusStr = "⚪ Mai controllato";
+          } else if (evState.lastResult?.status === "waiting_for_ticket_page") {
+            statusStr = "⏳ In attesa di vendite";
+          } else {
+            const count = evState.lastResult?.availableMatchedTicketCount ?? 0;
+            if (count > 0) statusStr = "🟢 " + count + " disp.";
+          }
+          lines.push(`- ${e.name}: ${statusStr}`);
+        }
+        await sendTelegramMessage(config, `✅ Controllo completato!\n\n📊 Report Aggiornato:\n\n${lines.join('\n')}`);
       }
     } catch (e) {
       console.error("Bot loop error:", e.message);
