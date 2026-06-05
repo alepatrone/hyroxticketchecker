@@ -1539,6 +1539,8 @@ async function startBotLoop() {
     console.log(`🌐 Server web avviato sulla porta ${port} (necessario per Render).`);
   });
 
+  let lastAutoCheckTime = 0;
+
   while (true) {
     try {
       const state = await loadState(config, defaultState);
@@ -1588,6 +1590,14 @@ async function startBotLoop() {
         await sendTelegramMessage(config, `✅ Controllo completato!\n\n📊 Report Aggiornato:\n\n${lines.join('\n')}`);
         
         targetEventKey = null;
+      } else {
+        const minimumMinutes = config.monitoring?.minimumMinutesBetweenChecks || 15;
+        if (!shouldSkipForInterval(state, config) && (Date.now() - lastAutoCheckTime > minimumMinutes * 60 * 1000)) {
+          console.log("\nAvvio scansione automatica periodica...");
+          await main();
+          lastAutoCheckTime = Date.now();
+          console.log("Scansione automatica periodica completata.\n");
+        }
       }
     } catch (e) {
       console.error("Bot loop error:", e.message);
