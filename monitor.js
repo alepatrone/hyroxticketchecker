@@ -1116,6 +1116,8 @@ async function processTelegramCommands(config, state) {
           let statusStr = "🔴 Esaurito";
           if (!evState) {
             statusStr = "⚪ Mai controllato";
+          } else if (evState.lastResult?.status === "error_fetching_page") {
+            statusStr = "⚠️ Errore pagina web";
           } else if (evState.lastResult?.status === "waiting_for_ticket_page") {
             statusStr = "⏳ In attesa di vendite";
           } else {
@@ -1158,11 +1160,11 @@ async function processTelegramCommands(config, state) {
   return { triggerCheck, stateModified };
 }
 
-async function main() {
+async function main(injectedState) {
   await loadDotEnv();
 
   const config = await loadJson(CONFIG_FILE);
-  const state = await loadState(config, defaultState);
+  const state = injectedState || await loadState(config, defaultState);
   validateConfig(config, state);
 
   if (notifyTest) {
@@ -1179,20 +1181,20 @@ async function main() {
       mockMessage
     );
     console.log(sent ? "Sent Telegram test notification." : "Telegram notification disabled.");
-    return;
+    return state;
   }
 
   if (workflowFailureNotify) {
     const sent = await sendTelegramMessage(config, buildWorkflowFailureMessage(config, state));
     console.log(sent ? "Sent Telegram workflow failure notification." : "Telegram notification disabled.");
-    return;
+    return state;
   }
 
   if (shouldSkipForInterval(state, config)) {
     console.log(
       `Skipped. Last checked at ${state.lastCheckedAt}; minimum interval is ${config.monitoring.minimumMinutesBetweenChecks} minutes. Use --force to check now.`
     );
-    return;
+    return state;
   }
 
   if (!isBotMode) {
@@ -1224,11 +1226,33 @@ async function main() {
         throw new Error(`No ticketPageUrl or officialEventPageUrl configured for ${eventConfig.name}.`);
       }
 
-      const officialPageHtml = await withRetries(
-        config,
-        `Fetch official event page for ${eventConfig.name}`,
-        () => fetchText(eventConfig.officialEventPageUrl, config)
-      );
+      let officialPageHtml;
+      try {
+        officialPageHtml = await withRetries(
+          config,
+          `Fetch official event page for ${eventConfig.name}`,
+          () => fetchText(eventConfig.officialEventPageUrl, config)
+        );
+      } catch (error) {
+        nextState.events[eventConfig.key] = {
+          lastCheckedAt: checkedAt,
+          eventName: eventConfig.name,
+          officialEventPageUrl: eventConfig.officialEventPageUrl,
+          ticketPageUrl: null,
+          checkoutPageUrl: null,
+          availabilityDetectorVersion: AVAILABILITY_DETECTOR_VERSION,
+          activeAthleteTicketIds: [],
+          activeAthleteTickets: [],
+          lastResult: {
+            status: "error_fetching_page",
+            error: serializeError(error),
+            availableMatchedTicketCount: 0
+          }
+        };
+        console.log(`Checked ${eventConfig.name}. Error: ${error.message}`);
+        continue;
+      }
+
       const officialPageSummary = summarizeOfficialPage(officialPageHtml, eventConfig);
       ticketPageUrl = discoverTicketPageUrl(officialPageHtml, eventConfig);
 
@@ -1496,13 +1520,13 @@ async function main() {
     if (!dryRun) {
       await saveState(config, nextState);
     }
-    return;
+    return nextState;
   }
 
   if (dryRun) {
     console.log("Dry run only; Telegram notification not sent.");
     console.log(alertMessages.join("\n\n---\n\n"));
-    return;
+    return nextState;
   }
 
   for (const message of alertMessages) {
@@ -1518,6 +1542,8 @@ async function main() {
   if (!dryRun) {
     await saveState(config, nextState);
   }
+  
+  return nextState;
 }
 
 async function startBotLoop() {
@@ -1539,11 +1565,11 @@ async function startBotLoop() {
     console.log(`🌐 Server web avviato sulla porta ${port} (necessario per Render).`);
   });
 
+  let state = await loadState(config, defaultState);
   let lastAutoCheckTime = 0;
 
   while (true) {
     try {
-      const state = await loadState(config, defaultState);
       validateConfig(config, state);
       const oldOffset = state.telegramUpdateOffset;
 
@@ -1556,12 +1582,12 @@ async function startBotLoop() {
       if (result.triggerCheck) {
         console.log("\nEseguo scansione immediata richiesta da Telegram...");
         force = true;
-        await main();
+        const newState = await main(state);
+        if (newState) state = newState;
         force = false;
         console.log("Scansione immediata completata.\n");
 
-        const latestState = await loadState(config, defaultState);
-        let allEvents = getConfiguredEvents(config, latestState);
+        let allEvents = getConfiguredEvents(config, state);
         
         if (targetEventKey) {
           allEvents = allEvents.filter(e => e.key === targetEventKey);
@@ -1569,10 +1595,12 @@ async function startBotLoop() {
 
         const lines = [];
         for (const e of allEvents) {
-          const evState = latestState.events?.[e.key];
+          const evState = state.events?.[e.key];
           let statusStr = "🔴 Esaurito";
           if (!evState) {
             statusStr = "⚪ Mai controllato";
+          } else if (evState.lastResult?.status === "error_fetching_page") {
+            statusStr = "⚠️ Errore pagina web";
           } else if (evState.lastResult?.status === "waiting_for_ticket_page") {
             statusStr = "⏳ In attesa di vendite";
           } else {
@@ -1594,7 +1622,8 @@ async function startBotLoop() {
         const minimumMinutes = config.monitoring?.minimumMinutesBetweenChecks || 15;
         if (!shouldSkipForInterval(state, config) && (Date.now() - lastAutoCheckTime > minimumMinutes * 60 * 1000)) {
           console.log("\nAvvio scansione automatica periodica...");
-          await main();
+          const newState = await main(state);
+          if (newState) state = newState;
           lastAutoCheckTime = Date.now();
           console.log("Scansione automatica periodica completata.\n");
         }
@@ -1621,7 +1650,7 @@ async function run() {
     config = await loadJson(CONFIG_FILE);
     state = await loadState(config, defaultState);
     stage = "monitor";
-    await main();
+    await main(state);
   } catch (error) {
     console.error(error.stack || error.message || error);
 
