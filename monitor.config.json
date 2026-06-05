@@ -12,7 +12,7 @@
     "timeoutSeconds": 30,
     "retryAttempts": 3,
     "retryDelaySeconds": 10,
-    "minimumMinutesBetweenChecks": 45,
+    "minimumMinutesBetweenChecks": 15,
     "alertOnlyOnChanges": true,
     "alertOnFirstRunAvailableTickets": true,
     "stateFile": "monitor.state.json",
