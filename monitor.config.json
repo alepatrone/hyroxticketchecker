@@ -20,7 +20,13 @@
   },
   "ticketFilter": {
     "onlyAthleteTickets": true,
-    "excludedCompetitionClasses": [],
+    "excludedCompetitionClasses": [
+      "SOLO_OPEN_W",
+      "SOLO_PRO_W",
+      "DOUBLES_W",
+      "DOUBLES_PRO_W",
+      "RELAY_W"
+    ],
     "competitionMetaField": "meta.is_competition",
     "competitionMetaValue": "TRUE",
     "availableWhen": {
@@ -32,7 +38,9 @@
       "ADAPTIVE",
       "SPECTATOR",
       "PHOTO PACKAGE",
-      "FREE U12"
+      "FREE U12",
+      "WOMEN",
+      "WOMENS"
     ],
     "prioritySignals": [
       {
