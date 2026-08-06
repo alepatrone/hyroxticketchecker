@@ -28,8 +28,8 @@ if (args.has("--help")) {
 Usage:
   node monitor.js                 Check if enough time has passed since the last run
   node monitor.js --force          Check now, ignoring the minimum interval
-  node monitor.js --dry-run        Check now without writing state or sending Discord
-  node monitor.js --notify-test    Send a test Discord notification
+  node monitor.js --dry-run        Check now without writing state or sending Telegram messages
+  node monitor.js --notify-test    Send a test Telegram notification
   node monitor.js --workflow-failure-notify
                                   Send a GitHub workflow failure notification
 `);
@@ -918,7 +918,7 @@ function maybeQueueTemporaryUnreadableAlert({
   }
 
   if (!shouldNotifyTemporaryUnreadableAlert(config)) {
-    console.log("Discord temporary unreadable notification type disabled.");
+    console.log("Telegram temporary unreadable notification type disabled.");
     return;
   }
 
@@ -968,7 +968,7 @@ async function notifyMonitorError(config, state, error, context = {}) {
       await markErrorNotified(config);
     }
   } catch (notificationError) {
-    console.error("Failed to send Discord error notification:", notificationError.message);
+    console.error("Failed to send Telegram error notification:", notificationError.message);
   }
 }
 
@@ -1538,7 +1538,7 @@ async function main(injectedState) {
     if (!sent) {
       throw new Error("Telegram notification was required for ticket alerts, but Telegram is disabled.");
     }
-    console.log(sent ? "Discord notification sent." : "Discord notification disabled.");
+    console.log(sent ? "Telegram notification sent." : "Telegram notification disabled.");
   }
 
   if (!dryRun) {
