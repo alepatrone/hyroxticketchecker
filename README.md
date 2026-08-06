@@ -26,10 +26,7 @@ The monitor tracks pre-configured static events as well as dynamically added eve
 
 | Event | Status | Details |
 | :--- | :--- | :--- |
-| **GoodLife HYROX Toronto** | 🟢 Monitored | Season 26/27 |
-| **HYROX Chiba** | 🟢 Monitored | Season 26/27 (Men Divisions) |
-| **AirAsia HYROX Seoul** | 🟢 Monitored | Season 26/27 |
-| **HYROX Vancouver** | 🟡 Waiting | Pending ticket page launch |
+| **HYROX Milan** | 🟢 Monitored | Season 26/27 (Dec 5–6, 2026) |
 
 ---
 

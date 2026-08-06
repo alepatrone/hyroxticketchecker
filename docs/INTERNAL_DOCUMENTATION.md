@@ -8,10 +8,7 @@ This repository monitors configured HYROX event ticket pages and sends Discord a
 
 The current setup watches:
 
-- GoodLife HYROX Toronto | Season 26/27
-- HYROX Chiba | Season 26/27, men divisions only
-- AirAsia HYROX Seoul | Season 26/27
-- HYROX Vancouver, waiting for the official page to expose a ticket page
+- HYROX Milan | Season 26/27
 
 The monitor is intentionally conservative. It reads public HYROX/Vivenu page data and checkout availability JSON, but it does not add tickets to cart, bypass purchase queues or checkout controls, solve captchas, reserve tickets, or interact with payment flows.
 

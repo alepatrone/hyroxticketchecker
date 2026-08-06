@@ -1,33 +1,9 @@
 {
   "events": [
     {
-      "key": "toronto",
-      "name": "GoodLife HYROX Toronto | Season 26/27",
-      "officialEventPageUrl": "https://hyrox.com/event/goodlife-hyrox-toronto-26-27/"
-    },
-    {
-      "key": "chiba",
-      "name": "HYROX Chiba | Season 26/27",
-      "officialEventPageUrl": "https://hyrox.com/event/hyrox-chiba/",
-      "ticketFilter": {
-        "includedCompetitionClasses": [
-          "SOLO_OPEN_M",
-          "SOLO_PRO_M",
-          "DOUBLES_OPEN_M",
-          "DOUBLES_PRO_M",
-          "RELAY_M"
-        ]
-      }
-    },
-    {
-      "key": "seoul",
-      "name": "AirAsia | HYROX Seoul | Season 26/27",
-      "officialEventPageUrl": "https://hyrox.com/event/hyrox-seoul/"
-    },
-    {
-      "key": "vancouver",
-      "name": "HYROX Vancouver",
-      "officialEventPageUrl": "https://hyrox.com/event/hyrox-vancouver/"
+      "key": "milan",
+      "name": "HYROX Milan | Season 26/27",
+      "officialEventPageUrl": "https://hyrox.com/event/hyrox-milan/"
     }
   ],
   "monitoring": {
