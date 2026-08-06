@@ -2,12 +2,7 @@ name: HYROX Ticket Monitor
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
   schedule:
-    # GitHub schedules use UTC. One hourly check keeps Toronto, Chiba, Seoul,
-    # and Vancouver covered without trying to map separate event time zones.
     - cron: "17 * * * *"
 
 concurrency:
@@ -43,15 +38,7 @@ jobs:
       - name: Reset failure notification marker
         run: rm -f .monitor-cache/error-notified
 
-      - name: Send Telegram smoke test
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[discord-test]')
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: npm run notify-test
-
       - name: Run monitor
-        if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[discord-test]')
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
