@@ -777,12 +777,12 @@ async function sendTelegramMessage(config, content) {
 
   if (!botToken) {
     throw new Error(
-      `Telegram is enabled, but ${telegram.botTokenEnvVar || "TELEGRAM_BOT_TOKEN"} is not set.`
+      `Telegram is enabled in config, but ${telegram.botTokenEnvVar || "TELEGRAM_BOT_TOKEN"} is not set in environment/GitHub Secrets. Please verify the Secret name in GitHub Repository Settings.`
     );
   }
   if (!chatId) {
     throw new Error(
-      `Telegram is enabled, but ${telegram.chatIdEnvVar || "TELEGRAM_CHAT_ID"} is not set.`
+      `Telegram is enabled in config, but ${telegram.chatIdEnvVar || "TELEGRAM_CHAT_ID"} is not set in environment/GitHub Secrets. Please verify the Secret name in GitHub Repository Settings.`
     );
   }
 
@@ -1531,7 +1531,11 @@ async function main(injectedState) {
     return nextState;
   }
 
-  for (const message of alertMessages) {
+  for (let i = 0; i < alertMessages.length; i++) {
+    if (i > 0) {
+      await sleep(1000);
+    }
+    const message = alertMessages[i];
     const sent = await withRetries(config, "Send Telegram ticket notification", () =>
       sendTelegramMessage(config, message)
     );
