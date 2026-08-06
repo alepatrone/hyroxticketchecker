@@ -64,8 +64,8 @@ cp .env.example .env
 ```
 Fill in your Telegram Credentials:
 ```env
-TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
-TELEGRAM_CHAT_ID=-100123456789
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
 ```
 
 ### 3. Execution Commands
