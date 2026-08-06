@@ -1,9 +1,33 @@
 {
   "events": [
     {
-      "key": "tenerife",
-      "name": "HYROX Tenerife | Season 26/27",
-      "officialEventPageUrl": "https://hyrox.com/event/hyrox-tenerife/"
+      "key": "toronto",
+      "name": "GoodLife HYROX Toronto | Season 26/27",
+      "officialEventPageUrl": "https://hyrox.com/event/goodlife-hyrox-toronto-26-27/"
+    },
+    {
+      "key": "chiba",
+      "name": "HYROX Chiba | Season 26/27",
+      "officialEventPageUrl": "https://hyrox.com/event/hyrox-chiba/",
+      "ticketFilter": {
+        "includedCompetitionClasses": [
+          "SOLO_OPEN_M",
+          "SOLO_PRO_M",
+          "DOUBLES_OPEN_M",
+          "DOUBLES_PRO_M",
+          "RELAY_M"
+        ]
+      }
+    },
+    {
+      "key": "seoul",
+      "name": "AirAsia | HYROX Seoul | Season 26/27",
+      "officialEventPageUrl": "https://hyrox.com/event/hyrox-seoul/"
+    },
+    {
+      "key": "vancouver",
+      "name": "HYROX Vancouver",
+      "officialEventPageUrl": "https://hyrox.com/event/hyrox-vancouver/"
     }
   ],
   "monitoring": {
@@ -20,13 +44,7 @@
   },
   "ticketFilter": {
     "onlyAthleteTickets": true,
-    "excludedCompetitionClasses": [
-      "SOLO_OPEN_W",
-      "SOLO_PRO_W",
-      "DOUBLES_W",
-      "DOUBLES_PRO_W",
-      "RELAY_W"
-    ],
+    "excludedCompetitionClasses": [],
     "competitionMetaField": "meta.is_competition",
     "competitionMetaValue": "TRUE",
     "availableWhen": {
@@ -38,9 +56,7 @@
       "ADAPTIVE",
       "SPECTATOR",
       "PHOTO PACKAGE",
-      "FREE U12",
-      "WOMEN",
-      "WOMENS"
+      "FREE U12"
     ],
     "prioritySignals": [
       {

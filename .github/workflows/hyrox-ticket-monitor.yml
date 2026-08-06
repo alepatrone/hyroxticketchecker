@@ -1,0 +1,88 @@
+name: HYROX Ticket Monitor
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  schedule:
+    # GitHub schedules use UTC. One hourly check keeps Toronto, Chiba, Seoul,
+    # and Vancouver covered without trying to map separate event time zones.
+    - cron: "17 * * * *"
+
+concurrency:
+  group: hyrox-ticket-monitor
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Prepare state directory
+        run: mkdir -p .monitor-cache
+
+      - name: Restore monitor state
+        uses: actions/cache@v4
+        with:
+          path: .monitor-cache
+          key: hyrox-ticket-state-${{ github.run_id }}
+          restore-keys: |
+            hyrox-ticket-state-
+
+      - name: Reset failure notification marker
+        run: rm -f .monitor-cache/error-notified
+
+      - name: Send Telegram smoke test
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[discord-test]')
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: npm run notify-test
+
+      - name: Run monitor
+        if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[discord-test]')
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          HYROX_STATE_FILE: .monitor-cache/monitor.state.json
+          HYROX_LOG_FILE: .monitor-cache/monitor.log
+          HYROX_ERROR_NOTIFIED_FILE: .monitor-cache/error-notified
+        run: npm run check:now
+
+      - name: Notify workflow failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          HYROX_ERROR_NOTIFIED_FILE: .monitor-cache/error-notified
+        run: |
+          if [ -f .monitor-cache/error-notified ]; then
+            echo "Monitor script already sent a Telegram error notification."
+            exit 0
+          fi
+
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "No Telegram secrets configured; skipping failure notification."
+            exit 0
+          fi
+
+          npm run notify-workflow-failure
+
+      - name: Upload monitor diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitor-diagnostics
+          path: .monitor-cache
+          if-no-files-found: ignore

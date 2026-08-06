@@ -1168,13 +1168,15 @@ async function main(injectedState) {
   validateConfig(config, state);
 
   if (notifyTest) {
+    const sampleEventName = config.events?.[0]?.name || "HYROX Event";
+    const sampleEventUrl = config.events?.[0]?.officialEventPageUrl || "https://hyrox.com/";
     const mockMessage = `🧪 TEST: Esempio notifica biglietti HYROX\n\n` +
-      `PRIORITY: Open Men ticket available: HYROX Tenerife | Season 26/27\n` +
+      `PRIORITY: Open Men ticket available: ${sampleEventName}\n` +
       `- Mens Open (SOLO_OPEN_M, 2026-11-20, 15 available)\n\n` +
-      `HYROX Tenerife | Season 26/27 new or increased monitored athlete ticket availability detected.\n` +
+      `${sampleEventName} new or increased monitored athlete ticket availability detected.\n` +
       `- Mens Open (SOLO_OPEN_M, 2026-11-20, 15 available)\n` +
       `- Womens Pro (SOLO_PRO_W, 2026-11-20, 4 available, was 1)\n\n` +
-      `https://hyrox.com/event/hyrox-tenerife/`;
+      `${sampleEventUrl}`;
 
     const sent = await sendTelegramMessage(
       config,
