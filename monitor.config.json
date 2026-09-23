@@ -5,6 +5,18 @@
       "name": "HYROX Geneva | Season 26/27",
       "officialEventPageUrl": "https://hyrox.com/event/hyrox-geneva/"
     }
+    {
+  "key": "nice",
+  "name": "HYROX Nice | Season 26/27",
+  "officialEventPageUrl": "https://hyroxitaly.com/it/event/hyrox-nice-s26-27/",
+  "eventDates": { "timezone": "Europe/Paris" }
+},
+{
+  "key": "rome",
+  "name": "HYROX Rome | Season 26/27",
+  "officialEventPageUrl": "https://hyroxitaly.com/it/event/hyrox-rome/",
+  "eventDates": { "timezone": "Europe/Rome" }
+}
   ],
   "monitoring": {
     "mode": "checkout_page_availability_json",
