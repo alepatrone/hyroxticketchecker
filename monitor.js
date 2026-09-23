@@ -29,9 +29,15 @@ Usage:
   node monitor.js                 Check if enough time has passed since the last run
   node monitor.js --force          Check now, ignoring the minimum interval
   node monitor.js --dry-run        Check now without writing state or sending Telegram messages
+  node monitor.js --bot            Run the continuous Telegram bot (long-running process)
   node monitor.js --notify-test    Send a test Telegram notification
   node monitor.js --workflow-failure-notify
                                   Send a GitHub workflow failure notification
+
+Environment:
+  HYROX_DISABLE_TELEGRAM_COMMANDS=1
+                                  Do not read Telegram commands in one-shot mode
+                                  (use it in GitHub Actions when the bot runs elsewhere)
 `);
   process.exit(0);
 }
@@ -49,6 +55,10 @@ function slugify(value) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60) || "event";
+}
+
+function normalizeUrl(value) {
+  return String(value || "").trim().toLowerCase().replace(/\/+$/, "");
 }
 
 function getConfiguredEvents(config, state = {}) {
@@ -133,6 +143,10 @@ async function writeJson(filePath, value) {
   await fs.writeFile(filePath, raw, "utf8");
 }
 
+// NOTE: loadState/saveState now THROW on remote failures instead of silently
+// returning an empty state / skipping the write. Returning the fallback on a
+// read error caused the next save to overwrite the remote state (and wipe
+// dynamicEvents added with /add).
 async function loadState(config, fallback) {
   const binId = process.env.JSONBIN_BIN_ID;
   const apiKey = process.env.JSONBIN_API_KEY;
@@ -150,7 +164,7 @@ async function loadState(config, fallback) {
       return data.record || fallback;
     } catch (e) {
       console.error("Failed to read state from JSONBin:", e.message);
-      return fallback;
+      throw e;
     }
   }
 
@@ -175,7 +189,7 @@ async function saveState(config, state) {
       return;
     } catch (e) {
       console.error("Failed to write state to JSONBin:", e.message);
-      return;
+      throw e;
     }
   }
 
@@ -1011,7 +1025,7 @@ async function setTelegramCommands(config) {
   const commands = [
     { command: "report", description: "Mostra disponibilità eventi" },
     { command: "check", description: "Controlla biglietti adesso (anche /check città)" },
-    { command: "add", description: "Aggiungi evento (es. /add milan)" },
+    { command: "add", description: "Aggiungi evento (es. /add <url evento HYROX>)" },
     { command: "remove", description: "Rimuovi evento (es. /remove milan)" },
     { command: "list", description: "Elenca eventi monitorati" }
   ];
@@ -1026,6 +1040,32 @@ async function setTelegramCommands(config) {
   } catch (e) {
     console.error("Errore impostazione comandi Telegram:", e.message);
   }
+}
+
+function buildReportLines(config, state, eventsToReport) {
+  const lines = [];
+  for (const e of eventsToReport) {
+    const evState = state.events?.[e.key];
+    let statusStr = "🔴 Esaurito";
+    if (!evState) {
+      statusStr = "⚪ Mai controllato";
+    } else if (evState.lastResult?.status === "error_fetching_page") {
+      statusStr = "⚠️ Errore pagina web";
+    } else if (evState.lastResult?.status === "waiting_for_ticket_page") {
+      statusStr = "⏳ In attesa di vendite";
+    } else {
+      const count = evState.lastResult?.availableMatchedTicketCount ?? 0;
+      if (count > 0) statusStr = "🟢 " + count + " disp.";
+    }
+    lines.push(`- ${e.name}: ${statusStr}`);
+
+    if (evState && evState.lastResult?.availableMatchedTicketCount > 0 && evState.activeAthleteTickets) {
+      for (const ticket of evState.activeAthleteTickets) {
+        lines.push(`  └ ${ticket.name}: ${ticket.availableQuantity} disp.`);
+      }
+    }
+  }
+  return lines;
 }
 
 async function processTelegramCommands(config, state) {
@@ -1049,7 +1089,12 @@ async function processTelegramCommands(config, state) {
       body: JSON.stringify(body)
     });
 
-    if (!response.ok) return { triggerCheck, stateModified };
+    if (!response.ok) {
+      // Most common causes: 409 (another process is polling, or a webhook is set), 401 (bad token).
+      const errorBody = await response.text().catch(() => "");
+      console.error(`Telegram getUpdates failed: HTTP ${response.status} ${errorBody}`);
+      return { triggerCheck, stateModified };
+    }
     const data = await response.json();
     if (!data.ok || !Array.isArray(data.result) || data.result.length === 0) return { triggerCheck, stateModified };
 
@@ -1060,97 +1105,129 @@ async function processTelegramCommands(config, state) {
 
       const msg = update.message;
       if (!msg || !msg.text) continue;
-      if (String(msg.chat.id) !== String(chatId)) continue;
+      if (String(msg.chat.id) !== String(chatId)) {
+        console.log(`Ignored Telegram message from unauthorized chat ${msg.chat.id}.`);
+        continue;
+      }
 
-      const text = msg.text.trim();
-      if (text.startsWith('/add ')) {
-        let eventInput = text.slice(5).trim();
-        let eventUrl = eventInput;
-        
-        if (!eventUrl.startsWith('http')) {
-          let slug = eventUrl.toLowerCase().replace(/\s+/g, '-');
-          if (!slug.startsWith('hyrox-')) {
-            slug = 'hyrox-' + slug;
+      // Handle "/add@MyBot url" (groups) and bare commands sent from the Telegram menu.
+      const text = msg.text.trim().replace(/^(\/\w+)@\w+/, "$1");
+
+      // One failing command must not abort the remaining updates (the offset is already advanced).
+      try {
+        if (text === "/add" || text.startsWith("/add ")) {
+          const eventInput = text.slice(4).trim();
+
+          if (!eventInput) {
+            await sendTelegramMessage(
+              config,
+              "ℹ️ Uso: /add <url completo della pagina evento>\n" +
+                "Esempio: /add https://hyrox.com/event/goodlife-hyrox-toronto-26-27/"
+            );
+            continue;
           }
-          eventUrl = `https://hyrox.com/event/${slug}/`;
-        }
 
-        const newEvent = {
-          key: slugify(eventUrl),
-          name: `(Dynamic) ${eventUrl.split('/').filter(Boolean).pop()}`,
-          officialEventPageUrl: eventUrl
-        };
-        const exists = state.dynamicEvents.some(e => e.officialEventPageUrl === eventUrl || e.ticketPageUrl === eventUrl);
-        if (!exists) {
+          let eventUrl = eventInput;
+
+          if (!/^https?:\/\//i.test(eventUrl)) {
+            let slug = eventUrl.toLowerCase().replace(/\s+/g, '-');
+            if (!slug.startsWith('hyrox-')) {
+              slug = 'hyrox-' + slug;
+            }
+            eventUrl = `https://hyrox.com/event/${slug}/`;
+          }
+
+          try {
+            new URL(eventUrl);
+          } catch {
+            await sendTelegramMessage(config, `⚠️ URL non valido: ${eventUrl}`);
+            continue;
+          }
+
+          const normalized = normalizeUrl(eventUrl);
+          const alreadyMonitored = getConfiguredEvents(config, state).some((e) =>
+            [e.officialEventPageUrl, e.ticketPageUrl]
+              .filter(Boolean)
+              .some((u) => normalizeUrl(u) === normalized)
+          );
+
+          if (alreadyMonitored) {
+            await sendTelegramMessage(config, `⚠️ Questo evento è già monitorato.`);
+            continue;
+          }
+
+          // Make sure the page really exists before saving it.
+          try {
+            await fetchText(eventUrl, config);
+          } catch (fetchError) {
+            await sendTelegramMessage(
+              config,
+              `⚠️ Non riesco ad aprire questa pagina (${fetchError.message}).\n` +
+                `Controlla l'URL e riprova con l'indirizzo completo:\n${eventUrl}`
+            );
+            continue;
+          }
+
+          const newEvent = {
+            key: slugify(eventUrl),
+            name: `(Dynamic) ${eventUrl.split('/').filter(Boolean).pop()}`,
+            officialEventPageUrl: eventUrl
+          };
+
           state.dynamicEvents.push(newEvent);
           stateModified = true;
           await sendTelegramMessage(config, `✅ Evento aggiunto alla coda di monitoraggio:\n${eventUrl}`);
           console.log(`Added dynamic event via Telegram: ${eventUrl}`);
-        } else {
-          await sendTelegramMessage(config, `⚠️ Questo evento è già monitorato.`);
-        }
-      } else if (text === '/list') {
-        const allEvents = getConfiguredEvents(config, state);
-        const lines = allEvents.map(e => `- ${e.name}\n  ${e.officialEventPageUrl || e.ticketPageUrl}`);
-        await sendTelegramMessage(config, `📋 Eventi monitorati attualmente (${allEvents.length}):\n\n${lines.join('\n\n')}`);
-      } else if (text.startsWith('/remove ')) {
-        const query = text.slice(8).trim().toLowerCase();
-        const initialLength = state.dynamicEvents.length;
-        state.dynamicEvents = state.dynamicEvents.filter(e => 
-          !(e.officialEventPageUrl?.toLowerCase().includes(query)) && 
-          !(e.ticketPageUrl?.toLowerCase().includes(query)) &&
-          !(e.name?.toLowerCase().includes(query)) &&
-          !(e.key?.toLowerCase().includes(query))
-        );
-        if (state.dynamicEvents.length < initialLength) {
-          stateModified = true;
-          await sendTelegramMessage(config, `🗑️ Evento rimosso dal monitoraggio.`);
-        } else {
-          await sendTelegramMessage(config, `⚠️ L'evento non è stato trovato tra quelli aggiunti dinamicamente. Usa /list per vedere gli eventi.`);
-        }
-      } else if (text === '/report') {
-        const allEvents = getConfiguredEvents(config, state);
-        const lines = [];
-        for (const e of allEvents) {
-          const evState = state.events?.[e.key];
-          let statusStr = "🔴 Esaurito";
-          if (!evState) {
-            statusStr = "⚪ Mai controllato";
-          } else if (evState.lastResult?.status === "error_fetching_page") {
-            statusStr = "⚠️ Errore pagina web";
-          } else if (evState.lastResult?.status === "waiting_for_ticket_page") {
-            statusStr = "⏳ In attesa di vendite";
-          } else {
-            const count = evState.lastResult?.availableMatchedTicketCount ?? 0;
-            if (count > 0) statusStr = "🟢 " + count + " disp.";
-          }
-          lines.push(`- ${e.name}: ${statusStr}`);
-
-          if (evState && evState.lastResult?.availableMatchedTicketCount > 0 && evState.activeAthleteTickets) {
-            for (const ticket of evState.activeAthleteTickets) {
-              lines.push(`  └ ${ticket.name}: ${ticket.availableQuantity} disp.`);
-            }
-          }
-        }
-        await sendTelegramMessage(config, `📊 Report Disponibilità:\n\n${lines.join('\n')}`);
-      } else if (text === '/check' || text.startsWith('/check ')) {
-        const parts = text.split(' ');
-        if (parts.length > 1) {
-          const query = parts.slice(1).join(' ').toLowerCase();
+        } else if (text === '/list') {
           const allEvents = getConfiguredEvents(config, state);
-          const event = allEvents.find(e => e.key.includes(query) || (e.name && e.name.toLowerCase().includes(query)));
-          if (event) {
-             await sendTelegramMessage(config, `⏳ Avvio controllo immediato per:\n${event.name}...`);
-             targetEventKey = event.key;
-             triggerCheck = true;
-          } else {
-             await sendTelegramMessage(config, `⚠️ Evento non trovato: ${query}`);
+          const lines = allEvents.map(e => `- ${e.name}\n  ${e.officialEventPageUrl || e.ticketPageUrl}`);
+          await sendTelegramMessage(config, `📋 Eventi monitorati attualmente (${allEvents.length}):\n\n${lines.join('\n\n')}`);
+        } else if (text === '/remove' || text.startsWith('/remove ')) {
+          const query = text.slice(7).trim().toLowerCase();
+
+          if (!query) {
+            await sendTelegramMessage(config, "ℹ️ Uso: /remove <parte del nome o dell'URL>\nUsa /list per vedere gli eventi.");
+            continue;
           }
-        } else {
-          await sendTelegramMessage(config, `⏳ Avvio controllo immediato di tutti gli eventi...`);
-          targetEventKey = null;
-          triggerCheck = true;
+
+          const initialLength = state.dynamicEvents.length;
+          state.dynamicEvents = state.dynamicEvents.filter(e =>
+            !(e.officialEventPageUrl?.toLowerCase().includes(query)) &&
+            !(e.ticketPageUrl?.toLowerCase().includes(query)) &&
+            !(e.name?.toLowerCase().includes(query)) &&
+            !(e.key?.toLowerCase().includes(query))
+          );
+          if (state.dynamicEvents.length < initialLength) {
+            stateModified = true;
+            await sendTelegramMessage(config, `🗑️ Evento rimosso dal monitoraggio.`);
+          } else {
+            await sendTelegramMessage(config, `⚠️ L'evento non è stato trovato tra quelli aggiunti dinamicamente. Usa /list per vedere gli eventi.`);
+          }
+        } else if (text === '/report') {
+          const allEvents = getConfiguredEvents(config, state);
+          const lines = buildReportLines(config, state, allEvents);
+          await sendTelegramMessage(config, `📊 Report Disponibilità:\n\n${lines.join('\n')}`);
+        } else if (text === '/check' || text.startsWith('/check ')) {
+          const parts = text.split(' ');
+          if (parts.length > 1) {
+            const query = parts.slice(1).join(' ').toLowerCase();
+            const allEvents = getConfiguredEvents(config, state);
+            const event = allEvents.find(e => e.key.includes(query) || (e.name && e.name.toLowerCase().includes(query)));
+            if (event) {
+              await sendTelegramMessage(config, `⏳ Avvio controllo immediato per:\n${event.name}...`);
+              targetEventKey = event.key;
+              triggerCheck = true;
+            } else {
+              await sendTelegramMessage(config, `⚠️ Evento non trovato: ${query}`);
+            }
+          } else {
+            await sendTelegramMessage(config, `⏳ Avvio controllo immediato di tutti gli eventi...`);
+            targetEventKey = null;
+            triggerCheck = true;
+          }
         }
+      } catch (commandError) {
+        console.error(`Failed to handle Telegram command "${text}":`, commandError.message);
       }
     }
   } catch (err) {
@@ -1192,15 +1269,33 @@ async function main(injectedState) {
     return state;
   }
 
+  // One-shot mode (e.g. GitHub Actions): read Telegram commands BEFORE the interval check,
+  // so /add, /remove and /check are never lost because the last check was "too recent".
+  // In bot mode the continuous loop handles commands itself. Set
+  // HYROX_DISABLE_TELEGRAM_COMMANDS=1 in the workflow if the bot runs elsewhere, so that
+  // only ONE process consumes Telegram updates.
+  if (
+    !isBotMode &&
+    !dryRun &&
+    process.env.HYROX_DISABLE_TELEGRAM_COMMANDS !== "1"
+  ) {
+    const previousOffset = state.telegramUpdateOffset;
+    const commandResult = await processTelegramCommands(config, state);
+
+    if (commandResult.triggerCheck) {
+      force = true;
+    }
+
+    if (commandResult.stateModified || state.telegramUpdateOffset !== previousOffset) {
+      await saveState(config, state);
+    }
+  }
+
   if (shouldSkipForInterval(state, config)) {
     console.log(
       `Skipped. Last checked at ${state.lastCheckedAt}; minimum interval is ${config.monitoring.minimumMinutesBetweenChecks} minutes. Use --force to check now.`
     );
     return state;
-  }
-
-  if (!isBotMode) {
-    await processTelegramCommands(config, state);
   }
 
   let configuredEvents = getConfiguredEvents(config, state);
@@ -1548,7 +1643,7 @@ async function main(injectedState) {
   if (!dryRun) {
     await saveState(config, nextState);
   }
-  
+
   return nextState;
 }
 
@@ -1581,53 +1676,37 @@ async function startBotLoop() {
 
       const result = await processTelegramCommands(config, state);
 
+      // Commands are persisted immediately, so a later reload/scan cannot lose them.
       if (state.telegramUpdateOffset !== oldOffset || result.stateModified) {
-         await saveState(config, state);
+        await saveState(config, state);
       }
 
       if (result.triggerCheck) {
         console.log("\nEseguo scansione immediata richiesta da Telegram...");
         force = true;
+        // Reload the shared state first: another process (e.g. GitHub Actions) may have
+        // updated it since it was loaded, and we must not overwrite it with a stale copy.
+        state = await loadState(config, state);
         const newState = await main(state);
         if (newState) state = newState;
         force = false;
         console.log("Scansione immediata completata.\n");
 
         let allEvents = getConfiguredEvents(config, state);
-        
+
         if (targetEventKey) {
           allEvents = allEvents.filter(e => e.key === targetEventKey);
         }
 
-        const lines = [];
-        for (const e of allEvents) {
-          const evState = state.events?.[e.key];
-          let statusStr = "🔴 Esaurito";
-          if (!evState) {
-            statusStr = "⚪ Mai controllato";
-          } else if (evState.lastResult?.status === "error_fetching_page") {
-            statusStr = "⚠️ Errore pagina web";
-          } else if (evState.lastResult?.status === "waiting_for_ticket_page") {
-            statusStr = "⏳ In attesa di vendite";
-          } else {
-            const count = evState.lastResult?.availableMatchedTicketCount ?? 0;
-            if (count > 0) statusStr = "🟢 " + count + " disp.";
-          }
-          lines.push(`- ${e.name}: ${statusStr}`);
-
-          if (evState && evState.lastResult?.availableMatchedTicketCount > 0 && evState.activeAthleteTickets) {
-            for (const ticket of evState.activeAthleteTickets) {
-              lines.push(`  └ ${ticket.name}: ${ticket.availableQuantity} disp.`);
-            }
-          }
-        }
+        const lines = buildReportLines(config, state, allEvents);
         await sendTelegramMessage(config, `✅ Controllo completato!\n\n📊 Report Aggiornato:\n\n${lines.join('\n')}`);
-        
+
         targetEventKey = null;
       } else {
         const minimumMinutes = config.monitoring?.minimumMinutesBetweenChecks || 15;
         if (!shouldSkipForInterval(state, config) && (Date.now() - lastAutoCheckTime > minimumMinutes * 60 * 1000)) {
           console.log("\nAvvio scansione automatica periodica...");
+          state = await loadState(config, state);
           const newState = await main(state);
           if (newState) state = newState;
           lastAutoCheckTime = Date.now();
@@ -1635,7 +1714,10 @@ async function startBotLoop() {
         }
       }
     } catch (e) {
+      force = false;
       console.error("Bot loop error:", e.message);
+      // Back off so a failing remote (e.g. JSONBin rate limit) is not hammered every 3 seconds.
+      await sleep(15000);
     }
     await sleep(3000);
   }
@@ -1649,12 +1731,14 @@ async function run() {
 
   let config = null;
   let state = defaultState;
+  let stateLoaded = false;
   let stage = "startup";
 
   try {
     await loadDotEnv();
     config = await loadJson(CONFIG_FILE);
     state = await loadState(config, defaultState);
+    stateLoaded = true;
     stage = "monitor";
     await main(state);
   } catch (error) {
@@ -1663,14 +1747,24 @@ async function run() {
     if (config && !dryRun) {
       try {
         let latestState = state;
+        let canSaveState = stateLoaded;
 
         try {
           latestState = await loadState(config, state);
+          canSaveState = true;
         } catch (stateError) {
           console.error("Could not reload state while handling error:", stateError.message);
         }
 
-        await recordMonitorError(config, latestState, error, { stage });
+        if (canSaveState) {
+          await recordMonitorError(config, latestState, error, { stage });
+        } else {
+          // Never persist the empty default state: it would overwrite the real remote state.
+          await appendLog(config, "error", "Monitor failed (state unavailable, not saved)", {
+            stage,
+            error: serializeError(error)
+          });
+        }
         await notifyMonitorError(config, latestState, error, { stage });
       } catch (handlingError) {
         console.error("Failed while handling monitor error:", handlingError.stack || handlingError.message || handlingError);
