@@ -45,6 +45,7 @@ jobs:
           HYROX_STATE_FILE: .monitor-cache/monitor.state.json
           HYROX_LOG_FILE: .monitor-cache/monitor.log
           HYROX_ERROR_NOTIFIED_FILE: .monitor-cache/error-notified
+          HYROX_SEND_REPORT: ${{ github.event_name == 'workflow_dispatch' }}
         run: npm run check:now
 
       - name: Notify workflow failure

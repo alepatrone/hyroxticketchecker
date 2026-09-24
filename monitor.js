@@ -9,6 +9,8 @@ const args = new Set(process.argv.slice(2));
 const dryRun = args.has("--dry-run");
 let force = args.has("--force") || dryRun;
 let targetEventKey = null;
+// Set by the workflow on manual runs, or by a /check command read in one-shot mode.
+let sendReportAfterCheck = process.env.HYROX_SEND_REPORT === "true";
 const isBotMode = args.has("--bot");
 const notifyTest = args.has("--notify-test");
 const workflowFailureNotify = args.has("--workflow-failure-notify");
@@ -67,11 +69,19 @@ function getConfiguredEvents(config, state = {}) {
     : [config.event].filter(Boolean);
 
   const dynamicEvents = state.dynamicEvents || [];
+  // Static events from monitor.config.json can be switched off with /remove (and back on with /add).
+  const removedKeys = new Set(state.removedStaticEventKeys || []);
 
-  return [...baseEvents, ...dynamicEvents].map((eventConfig, index) => ({
-    ...eventConfig,
-    key: eventConfig.key || slugify(eventConfig.name || eventConfig.ticketPageUrl || index)
-  }));
+  return [...baseEvents, ...dynamicEvents]
+    .map((eventConfig, index) => ({
+      ...eventConfig,
+      key: eventConfig.key || slugify(eventConfig.name || eventConfig.ticketPageUrl || index)
+    }))
+    .filter((eventConfig) => !removedKeys.has(eventConfig.key));
+}
+
+function getStaticEvents(config) {
+  return getConfiguredEvents(config, {});
 }
 
 function validateConfig(config, state = {}) {
@@ -80,7 +90,8 @@ function validateConfig(config, state = {}) {
     throw new Error(`Unsupported monitoring.mode: ${mode}`);
   }
 
-  if (getConfiguredEvents(config, state).length === 0) {
+  // Only fail when nothing is configured at all: removing every event with /remove is allowed.
+  if (getStaticEvents(config).length === 0 && (state.dynamicEvents || []).length === 0) {
     throw new Error("No HYROX events configured.");
   }
 }
@@ -1145,6 +1156,21 @@ async function processTelegramCommands(config, state) {
           }
 
           const normalized = normalizeUrl(eventUrl);
+          const matchesUrl = (e) =>
+            [e.officialEventPageUrl, e.ticketPageUrl]
+              .filter(Boolean)
+              .some((u) => normalizeUrl(u) === normalized);
+
+          const removedStatic = getStaticEvents(config).find(
+            (e) => (state.removedStaticEventKeys || []).includes(e.key) && matchesUrl(e)
+          );
+          if (removedStatic) {
+            state.removedStaticEventKeys = state.removedStaticEventKeys.filter((k) => k !== removedStatic.key);
+            stateModified = true;
+            await sendTelegramMessage(config, `✅ Evento riattivato:\n${removedStatic.name}`);
+            continue;
+          }
+
           const alreadyMonitored = getConfiguredEvents(config, state).some((e) =>
             [e.officialEventPageUrl, e.ticketPageUrl]
               .filter(Boolean)
@@ -1190,18 +1216,29 @@ async function processTelegramCommands(config, state) {
             continue;
           }
 
-          const initialLength = state.dynamicEvents.length;
-          state.dynamicEvents = state.dynamicEvents.filter(e =>
-            !(e.officialEventPageUrl?.toLowerCase().includes(query)) &&
-            !(e.ticketPageUrl?.toLowerCase().includes(query)) &&
-            !(e.name?.toLowerCase().includes(query)) &&
-            !(e.key?.toLowerCase().includes(query))
-          );
-          if (state.dynamicEvents.length < initialLength) {
+          const matchesQuery = (e) =>
+            [e.officialEventPageUrl, e.ticketPageUrl, e.name, e.key]
+              .some((v) => v?.toLowerCase().includes(query));
+
+          const removedDynamic = state.dynamicEvents.filter(matchesQuery);
+          state.dynamicEvents = state.dynamicEvents.filter((e) => !matchesQuery(e));
+
+          const removedKeys = new Set(state.removedStaticEventKeys || []);
+          const removedStatic = getStaticEvents(config).filter((e) => !removedKeys.has(e.key) && matchesQuery(e));
+          if (removedStatic.length > 0) {
+            state.removedStaticEventKeys = [...removedKeys, ...removedStatic.map((e) => e.key)];
+          }
+
+          const removedNames = [...removedDynamic, ...removedStatic].map((e) => `- ${e.name}`);
+          if (removedNames.length > 0) {
             stateModified = true;
-            await sendTelegramMessage(config, `🗑️ Evento rimosso dal monitoraggio.`);
+            await sendTelegramMessage(
+              config,
+              `🗑️ Rimosso dal monitoraggio:\n${removedNames.join("\n")}` +
+                (removedStatic.length > 0 ? `\n\nPer riattivarlo: /add <url evento>` : "")
+            );
           } else {
-            await sendTelegramMessage(config, `⚠️ L'evento non è stato trovato tra quelli aggiunti dinamicamente. Usa /list per vedere gli eventi.`);
+            await sendTelegramMessage(config, `⚠️ Nessun evento corrisponde a "${query}". Usa /list per vedere gli eventi.`);
           }
         } else if (text === '/report') {
           const allEvents = getConfiguredEvents(config, state);
@@ -1284,6 +1321,7 @@ async function main(injectedState) {
 
     if (commandResult.triggerCheck) {
       force = true;
+      sendReportAfterCheck = true;
     }
 
     if (commandResult.stateModified || state.telegramUpdateOffset !== previousOffset) {
@@ -1740,7 +1778,19 @@ async function run() {
     state = await loadState(config, defaultState);
     stateLoaded = true;
     stage = "monitor";
-    await main(state);
+    const finalState = await main(state);
+
+    // Ticket alerts only fire on changes, so a manual run (workflow_dispatch or /check)
+    // would otherwise finish silently. Always answer it with the current report.
+    if (sendReportAfterCheck && !dryRun && !notifyTest && !workflowFailureNotify && finalState) {
+      let reportEvents = getConfiguredEvents(config, finalState);
+      if (targetEventKey) reportEvents = reportEvents.filter((e) => e.key === targetEventKey);
+      const lines = buildReportLines(config, finalState, reportEvents);
+      await sendTelegramMessage(
+        config,
+        `✅ Controllo completato!\n\n📊 Report:\n\n${lines.join("\n") || "Nessun evento monitorato."}`
+      );
+    }
   } catch (error) {
     console.error(error.stack || error.message || error);
 
