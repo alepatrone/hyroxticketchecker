@@ -1097,7 +1097,12 @@ async function processTelegramCommands(config, state) {
     let updates;
 
     if (forwardedCommand) {
-      updates = [{ message: { chat: { id: chatId }, text: forwardedCommand } }];
+      // webhook.js batches the commands that queued up while a run was waiting, one per line.
+      updates = forwardedCommand
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((text) => ({ message: { chat: { id: chatId }, text } }));
     } else {
       const offset = state.telegramUpdateOffset ? state.telegramUpdateOffset + 1 : undefined;
       const url = `https://api.telegram.org/bot${botToken}/getUpdates`;

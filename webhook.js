@@ -69,24 +69,78 @@ function reply(text) {
   );
 }
 
-async function dispatchWorkflow(command) {
-  const response = await fetch(
-    `https://api.github.com/repos/${githubRepo}/actions/workflows/${githubWorkflow}/dispatches`,
-    {
-      method: "POST",
-      headers: {
-        accept: "application/vnd.github+json",
-        authorization: `Bearer ${githubToken}`,
-        "x-github-api-version": "2022-11-28",
-        "user-agent": "hyrox-ticket-monitor-webhook"
-      },
-      body: JSON.stringify({ ref: githubRef, inputs: { telegram_command: command } })
+function github(pathname, options = {}) {
+  return fetch(`https://api.github.com/repos/${githubRepo}/actions/workflows/${githubWorkflow}${pathname}`, {
+    ...options,
+    headers: {
+      accept: "application/vnd.github+json",
+      authorization: `Bearer ${githubToken}`,
+      "x-github-api-version": "2022-11-28",
+      "user-agent": "hyrox-ticket-monitor-webhook"
     }
-  );
+  });
+}
+
+async function dispatchWorkflow(commands) {
+  const response = await github("/dispatches", {
+    method: "POST",
+    body: JSON.stringify({ ref: githubRef, inputs: { telegram_command: commands.join("\n") } })
+  });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
     throw new Error(`GitHub dispatch failed: HTTP ${response.status} ${body}`);
   }
+}
+
+// GitHub keeps at most ONE pending run per concurrency group and cancels the older
+// pending one when another arrives, which would silently drop commands. So commands
+// are queued here and dispatched only when no run is waiting to start; everything
+// that piled up meanwhile goes out together in a single run.
+const WAITING_STATUSES = new Set(["queued", "pending", "waiting", "requested"]);
+const commandQueue = [];
+let pumping = false;
+
+async function hasWaitingRun() {
+  const response = await github("/runs?per_page=10");
+  if (!response.ok) throw new Error(`GitHub runs list failed: HTTP ${response.status}`);
+  const data = await response.json();
+  return (data.workflow_runs || []).some((run) => WAITING_STATUSES.has(run.status));
+}
+
+async function pumpQueue() {
+  if (pumping) return;
+  pumping = true;
+  try {
+    while (commandQueue.length > 0) {
+      let waiting = true;
+      try {
+        waiting = await hasWaitingRun();
+      } catch (error) {
+        console.error(error.message);
+      }
+      if (waiting) {
+        await sleep(10000);
+        continue;
+      }
+
+      const batch = commandQueue.splice(0);
+      try {
+        await dispatchWorkflow(batch);
+        console.log(`Dispatched workflow for: ${batch.join(" ; ")}`);
+      } catch (error) {
+        console.error(error.message);
+        await reply(`⚠️ Non riesco ad avviare il workflow su GitHub.\n${error.message}`);
+      }
+      // A new run takes a few seconds to show up in the runs list.
+      await sleep(15000);
+    }
+  } finally {
+    pumping = false;
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function handleUpdate(update) {
@@ -110,14 +164,9 @@ async function handleUpdate(update) {
   }
   if (!KNOWN_COMMANDS.includes(command)) return;
 
-  try {
-    await dispatchWorkflow(text);
-    await reply(`⏳ Ricevuto: ${text}\nElaboro su GitHub, ti rispondo tra circa un minuto.`);
-    console.log(`Dispatched workflow for: ${text}`);
-  } catch (error) {
-    console.error(error.message);
-    await reply(`⚠️ Non riesco ad avviare il workflow su GitHub.\n${error.message}`);
-  }
+  commandQueue.push(text);
+  await reply(`⏳ Ricevuto: ${text}\nElaboro su GitHub, ti rispondo tra circa un minuto.`);
+  pumpQueue();
 }
 
 async function registerWebhook() {
