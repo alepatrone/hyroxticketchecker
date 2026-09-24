@@ -2,12 +2,18 @@ name: HYROX Ticket Monitor
 
 on:
   workflow_dispatch:
+    inputs:
+      telegram_command:
+        description: "Telegram command forwarded by webhook.js (leave empty for a manual check)"
+        required: false
+        default: ""
   schedule:
     - cron: "17 * * * *"
 
 concurrency:
   group: hyrox-ticket-monitor
-  cancel-in-progress: true
+  # Never cancel: a running job may be handling a Telegram command.
+  cancel-in-progress: false
 
 jobs:
   check:
@@ -45,7 +51,8 @@ jobs:
           HYROX_STATE_FILE: .monitor-cache/monitor.state.json
           HYROX_LOG_FILE: .monitor-cache/monitor.log
           HYROX_ERROR_NOTIFIED_FILE: .monitor-cache/error-notified
-          HYROX_SEND_REPORT: ${{ github.event_name == 'workflow_dispatch' }}
+          HYROX_TELEGRAM_COMMAND: ${{ inputs.telegram_command }}
+          HYROX_SEND_REPORT: ${{ github.event_name == 'workflow_dispatch' && inputs.telegram_command == '' }}
         run: npm run check:now
 
       - name: Notify workflow failure

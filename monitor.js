@@ -1089,30 +1089,43 @@ async function processTelegramCommands(config, state) {
   let triggerCheck = false;
   let stateModified = false;
 
+  // A command forwarded by the webhook service (webhook.js) arrives as a workflow input:
+  // the webhook already received it, so there is nothing to poll (and polling would 409).
+  const forwardedCommand = (process.env.HYROX_TELEGRAM_COMMAND || "").trim();
+
   try {
-    const offset = state.telegramUpdateOffset ? state.telegramUpdateOffset + 1 : undefined;
-    const url = `https://api.telegram.org/bot${botToken}/getUpdates`;
-    const body = offset ? { offset, allowed_updates: ["message"] } : { allowed_updates: ["message"] };
+    let updates;
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body)
-    });
+    if (forwardedCommand) {
+      updates = [{ message: { chat: { id: chatId }, text: forwardedCommand } }];
+    } else {
+      const offset = state.telegramUpdateOffset ? state.telegramUpdateOffset + 1 : undefined;
+      const url = `https://api.telegram.org/bot${botToken}/getUpdates`;
+      const body = offset ? { offset, allowed_updates: ["message"] } : { allowed_updates: ["message"] };
 
-    if (!response.ok) {
-      // Most common causes: 409 (another process is polling, or a webhook is set), 401 (bad token).
-      const errorBody = await response.text().catch(() => "");
-      console.error(`Telegram getUpdates failed: HTTP ${response.status} ${errorBody}`);
-      return { triggerCheck, stateModified };
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        // Most common causes: 409 (a webhook is set, e.g. webhook.js on Render), 401 (bad token).
+        const errorBody = await response.text().catch(() => "");
+        console.error(`Telegram getUpdates failed: HTTP ${response.status} ${errorBody}`);
+        return { triggerCheck, stateModified };
+      }
+      const data = await response.json();
+      if (!data.ok || !Array.isArray(data.result) || data.result.length === 0) return { triggerCheck, stateModified };
+      updates = data.result;
     }
-    const data = await response.json();
-    if (!data.ok || !Array.isArray(data.result) || data.result.length === 0) return { triggerCheck, stateModified };
 
     if (!state.dynamicEvents) state.dynamicEvents = [];
 
-    for (const update of data.result) {
-      state.telegramUpdateOffset = Math.max(state.telegramUpdateOffset || 0, update.update_id);
+    for (const update of updates) {
+      if (update.update_id !== undefined) {
+        state.telegramUpdateOffset = Math.max(state.telegramUpdateOffset || 0, update.update_id);
+      }
 
       const msg = update.message;
       if (!msg || !msg.text) continue;
@@ -1251,14 +1264,14 @@ async function processTelegramCommands(config, state) {
             const allEvents = getConfiguredEvents(config, state);
             const event = allEvents.find(e => e.key.includes(query) || (e.name && e.name.toLowerCase().includes(query)));
             if (event) {
-              await sendTelegramMessage(config, `⏳ Avvio controllo immediato per:\n${event.name}...`);
+              if (!forwardedCommand) await sendTelegramMessage(config, `⏳ Avvio controllo immediato per:\n${event.name}...`);
               targetEventKey = event.key;
               triggerCheck = true;
             } else {
               await sendTelegramMessage(config, `⚠️ Evento non trovato: ${query}`);
             }
           } else {
-            await sendTelegramMessage(config, `⏳ Avvio controllo immediato di tutti gli eventi...`);
+            if (!forwardedCommand) await sendTelegramMessage(config, `⏳ Avvio controllo immediato di tutti gli eventi...`);
             targetEventKey = null;
             triggerCheck = true;
           }

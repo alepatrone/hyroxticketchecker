@@ -4,7 +4,7 @@
   "private": true,
   "description": "HYROX ticket availability monitor",
   "scripts": {
-    "start": "node monitor.js --bot",
+    "start": "node webhook.js",
     "check": "node monitor.js",
     "check:now": "node monitor.js --force",
     "bot": "node monitor.js --bot",
