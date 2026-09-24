@@ -14,6 +14,7 @@
 //   GITHUB_WORKFLOW           default hyrox-ticket-monitor.yml
 //   GITHUB_REF                default main
 //   PUBLIC_URL                default RENDER_EXTERNAL_URL (set by Render)
+//   CHECK_INTERVAL_MINUTES    periodic check started from here, default 10 (0 = off)
 
 const http = require("node:http");
 
@@ -27,6 +28,12 @@ const githubWorkflow = env.GITHUB_WORKFLOW || "hyrox-ticket-monitor.yml";
 const githubRef = env.GITHUB_REF || "main";
 const publicUrl = (env.PUBLIC_URL || env.RENDER_EXTERNAL_URL || "").replace(/\/+$/, "");
 const port = env.PORT || 3000;
+// GitHub's own cron is heavily delayed (runs every 1-3 hours in practice), so this
+// always-on service (kept awake by UptimeRobot) starts the periodic checks itself.
+// 0 disables it and leaves only the workflow's cron.
+const checkIntervalMinutes = Number(env.CHECK_INTERVAL_MINUTES ?? 10);
+// Not a real command: monitor.js ignores it, so the run is a plain silent check.
+const AUTO_CHECK_MARKER = "/auto";
 
 const KNOWN_COMMANDS = ["/check", "/add", "/remove", "/list", "/report"];
 const COMMANDS_MENU = [
@@ -123,7 +130,10 @@ async function pumpQueue() {
         continue;
       }
 
-      const batch = commandQueue.splice(0);
+      const queued = commandQueue.splice(0);
+      // Any real command already runs a full check, so the marker is only needed alone.
+      const realCommands = queued.filter((command) => command !== AUTO_CHECK_MARKER);
+      const batch = realCommands.length > 0 ? realCommands : [AUTO_CHECK_MARKER];
       try {
         await dispatchWorkflow(batch);
         console.log(`Dispatched workflow for: ${batch.join(" ; ")}`);
@@ -220,5 +230,15 @@ server.listen(port, async () => {
     await registerWebhook();
   } catch (error) {
     console.error(error.message);
+  }
+
+  if (checkIntervalMinutes > 0) {
+    console.log(`Periodic check every ${checkIntervalMinutes} minutes.`);
+    setInterval(() => {
+      // Skip when something is already queued: that run will check anyway.
+      if (commandQueue.length > 0) return;
+      commandQueue.push(AUTO_CHECK_MARKER);
+      pumpQueue();
+    }, checkIntervalMinutes * 60 * 1000);
   }
 });
