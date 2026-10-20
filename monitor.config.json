@@ -16,7 +16,25 @@
   "name": "HYROX Rome | Season 26/27",
   "officialEventPageUrl": "https://hyroxitaly.com/it/event/hyrox-rome/",
   "eventDates": { "timezone": "Europe/Rome" }
-}
+},
+    {
+      "key": "milan-doubles-men-sunday",
+      "name": "HYROX Milan | Doubles Men Domenica 6/12",
+      "ticketPageUrl": "https://italy.hyrox.com/event/hyrox-milan-season-26-27-u1tx6x",
+      "eventDates": { "timezone": "Europe/Rome" },
+      "ticketFilter": {
+        "includedCompetitionClasses": ["DOUBLES_OPEN_M"],
+        "onlyDates": ["2026-12-06"],
+        "prioritySignals": [
+          {
+            "label": "Doubles Men Sunday",
+            "competitionClass": "DOUBLES_OPEN_M",
+            "nameMustNotContain": ["CHARITY"],
+            "priorityMessagePrefix": "🚨 PRIORITY: Doubles Men domenica disponibile"
+          }
+        ]
+      }
+    }
   ],
   "monitoring": {
     "mode": "checkout_page_availability_json",

@@ -669,7 +669,10 @@ function mergeTicketFilter(config, eventConfig) {
     excludedCompetitionClasses:
       eventFilter.excludedCompetitionClasses || globalFilter.excludedCompetitionClasses || [],
     prioritySignals:
-      eventFilter.prioritySignals || globalFilter.prioritySignals || []
+      eventFilter.prioritySignals || globalFilter.prioritySignals || [],
+    // Optional: only keep tickets on these local race days ("YYYY-MM-DD" in the event timezone).
+    onlyDates: eventFilter.onlyDates || globalFilter.onlyDates || [],
+    timeZone: eventConfig.eventDates?.timezone || null
   };
 }
 
@@ -680,6 +683,7 @@ function filterInterestingTickets(rawTickets, filter, event) {
       ? new Set(filter.includedCompetitionClasses)
       : null;
   const excludedClasses = new Set(filter.excludedCompetitionClasses || []);
+  const onlyDates = filter.onlyDates?.length > 0 ? new Set(filter.onlyDates) : null;
   const availableField = filter.availableWhen?.field || "buyable";
   const availableValue = filter.availableWhen?.equals ?? true;
 
@@ -694,6 +698,7 @@ function filterInterestingTickets(rawTickets, filter, event) {
     })
     .filter((ticket) => !includedClasses || includedClasses.has(ticket.competitionClass))
     .filter((ticket) => !excludedClasses.has(ticket.competitionClass))
+    .filter((ticket) => !onlyDates || onlyDates.has(formatDateInTimeZone(ticket.date, filter.timeZone)))
     .filter((ticket) => ticket[availableField] === availableValue)
     .sort((a, b) => a.name.localeCompare(b.name));
 }

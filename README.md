@@ -112,6 +112,23 @@ Customize event tracking, filters, and priority alerts in `monitor.config.json`:
 }
 ```
 
+### Watching a single category on a single day
+
+An event can carry its own `ticketFilter`. Use `includedCompetitionClasses` to watch only some categories and `onlyDates` (local race day, `YYYY-MM-DD` in `eventDates.timezone`) to watch only some days:
+
+```json
+{
+  "key": "milan-doubles-men-sunday",
+  "name": "HYROX Milan | Doubles Men Domenica 6/12",
+  "ticketPageUrl": "https://italy.hyrox.com/event/hyrox-milan-season-26-27-u1tx6x",
+  "eventDates": { "timezone": "Europe/Rome" },
+  "ticketFilter": {
+    "includedCompetitionClasses": ["DOUBLES_OPEN_M"],
+    "onlyDates": ["2026-12-06"]
+  }
+}
+```
+
 ---
 
 ## ⏰ Continuous GitHub Actions Setup
